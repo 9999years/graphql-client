@@ -19,7 +19,7 @@ module Data.GraphQL.Error (
 import Control.Exception (Exception (..))
 import Data.Aeson (FromJSON (..), ToJSON, Value, withObject, (.:))
 import Data.Aeson.Text (encodeToLazyText)
-import Data.List (intersperse)
+import Data.List (intercalate, intersperse)
 import Data.Text (Text, unpack)
 import Data.Text.Lazy (toStrict)
 import GHC.Generics (Generic)
@@ -33,19 +33,22 @@ data GraphQLError = GraphQLError
   }
   deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
-instance Exception GraphQLError where
-  displayException exception =
-    "At "
-      <> joinWithCommas (maybe [] (map displayErrorLoc) (locations exception))
-      <> ": "
-      <> unpack (message exception)
-      <> maybe "" (("\nPath: " <>) . joinWithCommas . map valueToString) (path exception)
-      <> maybe "" (("\nExtensions: " <>) . valueToString) (extensions exception)
-    where
-      joinWithCommas = unwords . intersperse ", "
+displayGraphQLError :: String -> String -> GraphQLError -> String
+displayGraphQLError indentFirst indentRest exception =
+  indentFirst
+    <> "At "
+    <> joinWithCommas (maybe [] (map displayErrorLoc) (locations exception))
+    <> ": "
+    <> unpack (message exception)
+    <> maybe "" (nextLine "Path: " . joinWithCommas . map valueToString) (path exception)
+    <> maybe "" (nextLine "Extensions: " . valueToString) (extensions exception)
+  where
+    joinWithCommas = unwords . intersperse ", "
 
-      valueToString :: Value -> String
-      valueToString = unpack . toStrict . encodeToLazyText
+    valueToString :: Value -> String
+    valueToString = unpack . toStrict . encodeToLazyText
+
+    nextLine prefix line = "\n" <> indentRest <> prefix <> line
 
 -- | A location in an error in a GraphQL query.
 data GraphQLErrorLoc = GraphQLErrorLoc
@@ -71,4 +74,5 @@ newtype GraphQLException = GraphQLException [GraphQLError]
 instance Exception GraphQLException where
   displayException (GraphQLException errors) =
     "GraphQL errors:\n"
-      <> concat (intersperse "\n\n" $ map displayException errors)
+      -- NOTE: `unlines` appends an extra `\n` at the end, which we don't want.
+      <> intercalate "\n" (map (displayGraphQLError "* " "  ") errors)
