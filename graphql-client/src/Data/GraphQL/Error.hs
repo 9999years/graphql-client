@@ -39,6 +39,7 @@ displayGraphQLError indentFirst indentRest exception =
     <> "At "
     <> joinWithCommas (maybe [] (map displayErrorLoc) (locations exception))
     <> ": "
+    -- Note: If this message contains multiple lines, subsequent lines will not be indented correctly.
     <> unpack (message exception)
     <> maybe "" (nextLine "Path: " . joinWithCommas . map valueToString) (path exception)
     <> maybe "" (nextLine "Extensions: " . valueToString) (extensions exception)
